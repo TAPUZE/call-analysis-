@@ -7,7 +7,6 @@ let apiKeyStatusElement, processingStatus, transcriptionInput, modal, modalTitle
 
 // Note: 'advancedAnalysisPrompt' is now expected to be defined globally 
 // by including prompts.js BEFORE this script in index.html.
-// We'll check for its existence more robustly in DOMContentLoaded.
 
 
 // --- Initialize Page ---
@@ -32,11 +31,10 @@ document.addEventListener('DOMContentLoaded', () => {
     
     if (typeof advancedAnalysisPrompt === 'undefined') {
         console.error("CRITICAL ERROR: advancedAnalysisPrompt is not defined. Make sure prompts.js is loaded before script.js and that the variable is correctly defined in prompts.js.");
-        if (processingStatus) { // Check if processingStatus element exists
+        if (processingStatus) { 
             processingStatus.textContent = "שגיאה קריטית: קובץ ההנחיות (prompts.js) לא נטען כראוי או שהמשתנה advancedAnalysisPrompt אינו מוגדר בו. בדוק את הקונסול.";
             processingStatus.className = "mt-3 text-sm text-red-500 font-bold";
         } else {
-            // Fallback if processingStatus itself isn't found (though it should be)
             alert("שגיאה קריטית בטעינת הנחיות AI. בדוק את הקונסול.");
         }
     }
@@ -207,23 +205,33 @@ function populateReportWithData(data) {
         }).join('');
     };
 
-    const createActionListItems = (itemsArray, forAharon = true) => {
-         if (!itemsArray || !Array.isArray(itemsArray) || itemsArray.length === 0) return '<li class="text-gray-500 italic">אין משימות זמינות.</li>';
+    // Updated function to handle a single list of action items
+    const createGeneralActionListItems = (itemsArray) => {
+         if (!itemsArray || !Array.isArray(itemsArray) || itemsArray.length === 0) {
+             return '<li class="text-gray-500 italic">אין משימות זמינות.</li>';
+         }
          return itemsArray.map(item => {
             const taskDescription = (item.taskDescription || 'משימה לא מוגדרת').replace(/</g, "&lt;").replace(/>/g, "&gt;");
-            let taskHTML = `<li><strong>${taskDescription}</strong>`;
+            const assignedTo = (item.assignedTo || 'לא הוקצה').replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            let taskHTML = `<li><strong>${taskDescription}</strong> (לטיפול: ${assignedTo})`;
             if(item.impliedUrgency) taskHTML += `. דחיפות: ${item.impliedUrgency}.`;
             if(item.contextReason) taskHTML += ` (הקשר: ${item.contextReason.replace(/</g, "&lt;").replace(/>/g, "&gt;")}).`;
 
+            // Logic to add "Generate Email Draft" button
+            // This can be based on keywords in taskDescription or if assignedTo is a specific person
             const taskDescLower = (item.taskDescription || "").toLowerCase();
-            if(forAharon && (taskDescLower.includes('נס מולטימדיה') || taskDescLower.includes('מוזיאון') || taskDescLower.includes('מני') || taskDescLower.includes('נחמן'))) {
+            const assignedToLower = (item.assignedTo || "").toLowerCase();
+            // Example: Add button if task involves outreach and is assigned to a person (not a generic team)
+            if ( (taskDescLower.includes('פנייה ל') || taskDescLower.includes('יצירת קשר עם') || taskDescLower.includes('תיאום עם')) && 
+                 !assignedToLower.includes('צוות') && !assignedToLower.includes('ללא הקצאה') && assignedTo.trim() !== "" ) {
                 let taskContext = item.contextReason || item.taskDescription.split('עם ')[1] || item.taskDescription; 
-                taskHTML += ` <button class="gemini-button ml-2" data-task-context="${taskContext.split('.')[0].trim().replace(/"/g, '&quot;')}" onclick="generateEmailDraft(this)"><i class="fas fa-wand-magic-sparkles"></i> הפק טיוטת מייל</button>`;
+                taskHTML += ` <button class="gemini-button ml-2" data-task-context="${taskContext.split('.')[0].trim().replace(/"/g, '&quot;')}" data-assigned-to="${assignedTo}" onclick="generateEmailDraft(this)"><i class="fas fa-wand-magic-sparkles"></i> הפק טיוטת מייל</button>`;
             }
             taskHTML += `</li>`;
             return taskHTML;
          }).join('');
     }
+
 
     // I. Executive Summary
     const summarySectionContent = document.querySelector('#section-summary .section-content');
@@ -243,15 +251,12 @@ function populateReportWithData(data) {
          summarySectionContent.innerHTML = '<p class="text-gray-500 italic">סיכום לא זמין.</p>';
     }
 
-    // II. Action Items
-    const aharonTasksUl = document.getElementById('aharon-tasks');
-    const kalmanDevTasksUl = document.getElementById('kalman-dev-tasks');
-    if (data.actionItems) {
-        if(aharonTasksUl) aharonTasksUl.innerHTML = createActionListItems(data.actionItems.forAharon, true);
-        if(kalmanDevTasksUl) kalmanDevTasksUl.innerHTML = createActionListItems(data.actionItems.forKalmanDev, false);
-    } else {
-        if(aharonTasksUl) aharonTasksUl.innerHTML = '<li class="text-gray-500 italic">אין משימות לאהרון.</li>';
-        if(kalmanDevTasksUl) kalmanDevTasksUl.innerHTML = '<li class="text-gray-500 italic">אין משימות לקלמן/צוות.</li>';
+    // II. Action Items - Now uses a single list
+    const allActionItemsUl = document.getElementById('all-action-items');
+    if (data.actionItems && allActionItemsUl) { // data.actionItems is now expected to be an array
+        allActionItemsUl.innerHTML = createGeneralActionListItems(data.actionItems);
+    } else if (allActionItemsUl) {
+        allActionItemsUl.innerHTML = '<li class="text-gray-500 italic">אין משימות ופעולות.</li>';
     }
     
     const sectionMappings = {
@@ -271,17 +276,17 @@ function populateReportWithData(data) {
                 for (const key in sectionData) {
                     let titleKey = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
                     const translations = {
-                        "productsServicesDiscussed": "מוצרים/שירותים שנדונו", "coreFunctionalityMVP": "פונקציונליות ליבה/MVP",
-                        "futureDevelopment": "פיתוח עתידי", "uxUiPoints": "נקודות UX/UI",
-                        "keyStrengthsUSPs": "חוזקות מרכזיות/USPs", "weaknessesImprovements": "חולשות/אזורים לשיפור",
-                        "pricingTiersProposals": "הצעות תמחור", "costConsiderations": "שיקולי עלות",
-                        "revenueModelStrategy": "מודל הכנסות", "financialConcernsTargets": "חששות/יעדים פיננסיים",
-                        "targetCustomerProfiles": "פרופיל לקוח יעד", "marketSegments": "פלחי שוק",
-                        "salesGoToMarket": "אסטרטגיית מכירות/שיווק", "competitorMentionsPositioning": "אזכורי מתחרים/מיצוב",
-                        "keyTechnologiesPlatforms": "טכנולוגיות/פלטפורמות מפתח", "technicalBlockersChallenges": "חסמים/אתגרים טכניים",
-                        "integrationPoints": "נקודות אינטגרציה", "dataSecurityPrivacy": "אבטחת מידע ופרטיות",
-                        "potentialExistingPartners": "שותפים פוטנציאליים/קיימים", "externalResourcesFreelancers": "משאבים חיצוניים/פרילנסרים",
-                        "natureOfCollaboration": "אופי השיתוף פעולה/תלות"
+                        "productsServicesDiscussed": "מוצרים/שירותים שנדונו", "customerNeedsAddressed": "צרכי לקוח שטופלו",
+                        "featureRequestsOrFeedback": "בקשות תכונה/משוב", "keyStrengthsUSPs": "חוזקות מרכזיות/USPs", 
+                        "weaknessesImprovements": "חולשות/אזורים לשיפור",
+                        "pricingMentionsOrProposals": "אזכורי תמחור/הצעות", "budgetConstraintsExpressed": "מגבלות תקציב שהובעו",
+                        "valuePropositionDiscussed": "הצעת ערך שנדונה", "paymentTermsMentions": "אזכורי תנאי תשלום",
+                        "customerProfileInsights": "תובנות פרופיל לקוח", "marketSegmentsMentioned": "פלחי שוק שאוזכרו",
+                        "leadSource": "מקור הליד",
+                        "keyTechnologiesPlatforms": "טכנולוגיות/פלטפורמות מפתח", "technicalIssuesReported": "בעיות טכניות שדווחו",
+                        "solutionsProposedOrImplemented": "פתרונות שהוצעו/יושמו", "dataSecurityPrivacyMentions": "אזכורי אבטחת מידע/פרטיות",
+                        "potentialOrExistingPartners": "שותפים פוטנציאליים/קיימים", "competitorMentions": "אזכורי מתחרים",
+                        "externalResourcesNeeded": "משאבים חיצוניים נדרשים"
                     };
                     titleKey = translations[key] || titleKey;
 
@@ -300,34 +305,33 @@ function populateReportWithData(data) {
     
     // Key Concerns
     const concernsListElement = document.getElementById('concerns-list');
-    if (data.keyConcerns && data.keyConcerns.majorConcernsVoiced && data.keyConcerns.majorConcernsVoiced.length > 0) {
-        if(concernsListElement) concernsListElement.innerHTML = createListItems(data.keyConcerns.majorConcernsVoiced);
-    } else {
-        if(concernsListElement) concernsListElement.innerHTML = '<li class="text-gray-500 italic">אין חששות מרכזיים.</li>';
+    if (data.keyConcerns && concernsListElement) {
+        let concernsHTML = '';
+        if (data.keyConcerns.customerPainPoints && data.keyConcerns.customerPainPoints.length > 0) {
+            concernsHTML += '<h3>נקודות כאב של הלקוח:</h3><ul>' + createListItems(data.keyConcerns.customerPainPoints) + '</ul>';
+        }
+        if (data.keyConcerns.objectionsRaised && data.keyConcerns.objectionsRaised.length > 0) {
+            concernsHTML += '<h3 class="mt-4">התנגדויות שהועלו:</h3><ul>' + createListItems(data.keyConcerns.objectionsRaised) + '</ul>';
+        }
+        if (data.keyConcerns.risksOrChallengesDiscussed && data.keyConcerns.risksOrChallengesDiscussed.length > 0) {
+            concernsHTML += '<h3 class="mt-4">סיכונים/אתגרים שנדונו:</h3><ul>' + createListItems(data.keyConcerns.risksOrChallengesDiscussed) + '</ul>';
+        }
+        concernsListElement.innerHTML = concernsHTML || '<li class="text-gray-500 italic">אין חששות מרכזיים.</li>';
+    } else if (concernsListElement) {
+        concernsListElement.innerHTML = '<li class="text-gray-500 italic">אין חששות מרכזיים.</li>';
     }
+
 
     // Participant Info
     const participantElement = document.querySelector('#section-participants-roles .section-content');
     if (participantElement) {
-        if (data.participantInfo) {
+        if (data.participantInfo && Array.isArray(data.participantInfo) && data.participantInfo.length > 0) {
             let participantHTML = '<ul>';
-            if (data.participantInfo.participant1Name) { 
-                participantHTML += `<li><strong>${data.participantInfo.participant1Name.replace(/</g, "&lt;").replace(/>/g, "&gt;")}:</strong> ${ (data.participantInfo.participant1Role || 'לא צוין תפקיד').replace(/</g, "&lt;").replace(/>/g, "&gt;") }</li>`;
-                if (data.participantInfo.participant2Name) {
-                    participantHTML += `<li><strong>${data.participantInfo.participant2Name.replace(/</g, "&lt;").replace(/>/g, "&gt;")}:</strong> ${ (data.participantInfo.participant2Role || 'לא צוין תפקיד').replace(/</g, "&lt;").replace(/>/g, "&gt;") }</li>`;
-                }
-            } else if (data.participantInfo.companyRepresentatives) {
-                data.participantInfo.companyRepresentatives.forEach(rep => {
-                    participantHTML += `<li><strong>נציג חברה: ${ (rep.name || '').replace(/</g, "&lt;").replace(/>/g, "&gt;") }</strong> (${ (rep.role || 'לא צוין תפקיד').replace(/</g, "&lt;").replace(/>/g, "&gt;") })</li>`;
-                });
-                 if (data.participantInfo.clientExternalInfo) {
-                    const client = data.participantInfo.clientExternalInfo;
-                    participantHTML += `<li><strong>לקוח/גורם חיצוני: ${ (client.name || '').replace(/</g, "&lt;").replace(/>/g, "&gt;") }</strong> (${ (client.company || '').replace(/</g, "&lt;").replace(/>/g, "&gt;") }, ${ (client.role || '').replace(/</g, "&lt;").replace(/>/g, "&gt;") })</li>`;
-                    if(client.needs) participantHTML += `<li><strong>צרכים עיקריים:</strong> ${client.needs.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</li>`;
-                }
-            }
+            data.participantInfo.forEach(p => {
+                 participantHTML += `<li><strong>${(p.participantName || 'לא ידוע').replace(/</g, "&lt;").replace(/>/g, "&gt;")}:</strong> ${(p.participantRoleInCall || 'לא צוין תפקיד').replace(/</g, "&lt;").replace(/>/g, "&gt;")}</li>`;
+            });
             participantHTML += '</ul>';
-            participantElement.innerHTML = participantHTML.includes('<li>') ? participantHTML : '<p class="text-gray-500 italic">פרטי משתתפים לא זמינים.</p>';
+            participantElement.innerHTML = participantHTML;
         } else {
             participantElement.innerHTML = '<p class="text-gray-500 italic">פרטי משתתפים לא זמינים.</p>';
         }
@@ -375,8 +379,9 @@ function populateReportWithData(data) {
 
     csvDataPoints.length = 1; 
     if(data.executiveSummary) csvDataPoints.push(["סיכום מנהלים", data.executiveSummary.mainPurpose || ""]);
-     if(data.actionItems && data.actionItems.forAharon) data.actionItems.forAharon.forEach(task => csvDataPoints.push(["משימה לאהרון", task.taskDescription]));
-    if(data.actionItems && data.actionItems.forKalmanDev) data.actionItems.forKalmanDev.forEach(task => csvDataPoints.push(["משימה לקלמן/צוות", task.taskDescription]));
+    if(data.actionItems && Array.isArray(data.actionItems)) {
+        data.actionItems.forEach(task => csvDataPoints.push([`משימה (${task.assignedTo || 'לא הוקצה'})`, task.taskDescription]));
+    }
 }
 
 
@@ -445,30 +450,32 @@ async function callGeminiAPI(prompt, isJsonOutput = false) {
 async function generateEmailDraft(buttonElement) {
     const taskItem = buttonElement.closest('li');
     if (!taskItem) return;
-    const taskContext = taskItem.dataset.taskContext || taskItem.textContent.split('.')[0].trim(); 
-    const callSummaryElement = document.querySelector('#section-summary .section-content p');
+    const taskContext = buttonElement.dataset.taskContext || taskItem.textContent.split('.')[0].trim(); 
+    const assignedTo = buttonElement.dataset.assignedTo || "הצוות"; 
+    const callSummaryElement = document.querySelector('#section-summary .section-content p'); 
     const callSummary = callSummaryElement ? callSummaryElement.textContent : "לא סופק סיכום שיחה עדיין.";
-    const productName = "המוצר שלנו לתמלול וניהול שיחות חכם"; 
+    const productName = "המוצר/שירות שלנו"; 
     const userProvidedContext = additionalContextInput ? additionalContextInput.value.trim() : "";
 
     openModal(`✨ הפקת טיוטת מייל עבור: ${taskContext}`);
 
     let prompt = `
-        אתה מתפקד כעוזר אישי עבור אהרון.
+        אתה מתפקד כעוזר אישי.
         המשימה שלך היא לכתוב טיוטת מייל מקצועית וידידותית בעברית.
+        המייל נשלח על ידי: "${assignedTo}".
         הנמען הוא איש קשר בנושא: "${taskContext}".
         מטרת המייל היא ליזום פגישה או המשך שיחה בנושא זה.
         
-        הרקע הכללי לשיחה (מסיכום שיחת תכנון פנימית): "${callSummary}"
-        שם המוצר/המיזם המרכזי שאהרון וקלמן מפתחים הוא: "${productName}".
+        הרקע הכללי לשיחה (מסיכום שיחת התכנון): "${callSummary}"
+        שם המוצר/המיזם המרכזי הוא: "${productName}".
         
         במייל, אנא:
-        1. הצג את אהרון (אם רלוונטי, ניתן להניח שהייתה היכרות מוקדמת קלה או ששמו הוזכר).
+        1. התחל בפנייה מתאימה.
         2. ציין בקצרה את הנושא ("${taskContext}") ואת הרצון לקבוע פגישה/שיחה להרחבה.
-        3. אם מתאים, רמוז לערך הפוטנציאלי של "${productName}" עבור הנמען או שיתוף הפעולה.
+        3. אם מתאים, רמוז לערך הפוטנציאלי של "${productName}" או שיתוף הפעולה עבור הנמען.
         4. הצע זמינות לפגישה או בקש מהנמען להציע זמן שנוח לו.
         5. שמור על טון חיובי ומקצועי.
-        6. סיום בנימוס עם פרטי יצירת קשר של אהרון (ניתן להשתמש בפרטים גנריים כמו "אהרון | [מספר טלפון] | [כתובת מייל]").
+        6. סיום בנימוס עם פרטי יצירת קשר של "${assignedTo}" (ניתן להשתמש בפרטים גנריים כמו "[שם] | [מספר טלפון] | [כתובת מייל]").
     `;
     if (userProvidedContext) {
         prompt += `\n\nהקשר נוסף שסופק על ידי המשתמש ושחשוב להתייחס אליו בעדינות בטיוטה: "${userProvidedContext}"`;
@@ -576,14 +583,20 @@ function generateGoogleCalendarLink(title, startDate, endDate, description, loca
 }
 
 async function getCalendarSuggestions() {
-    const aharonTasksList = document.getElementById('aharon-tasks');
-    let aharonTasksText = "משימות עיקריות לתיאום פגישות עבור אהרון:\n";
-    if (aharonTasksList && aharonTasksList.children.length > 0 && !aharonTasksList.children[0].classList.contains('italic')) {
-        aharonTasksList.querySelectorAll('li[data-task-context]').forEach(li => { 
-            aharonTasksText += `- ${li.textContent.split('<button')[0].trim()}\n`;
+    const allActionItemsList = document.getElementById('all-action-items'); 
+    let meetingTasksText = "משימות עיקריות לתיאום פגישות:\n";
+    if (allActionItemsList && allActionItemsList.children.length > 0 && !allActionItemsList.children[0].classList.contains('italic')) {
+        allActionItemsList.querySelectorAll('li').forEach(li => { 
+            const taskText = li.textContent.toLowerCase();
+            if (taskText.includes('פגישה') || taskText.includes('תיאום עם') || taskText.includes('ליצור קשר עם')) {
+                 meetingTasksText += `- ${li.textContent.split('<button')[0].trim()}\n`;
+            }
         });
+        if (meetingTasksText === "משימות עיקריות לתיאום פגישות:\n") { 
+            meetingTasksText = "לא זוהו משימות ספציפיות לתיאום פגישות בניתוח הנוכחי.\n";
+        }
     } else {
-         aharonTasksText = "לא זוהו משימות ספציפיות לתיאום פגישות עבור אהרון בניתוח הנוכחי.\n";
+         meetingTasksText = "לא זוהו משימות ספציפיות לתיאום פגישות בניתוח הנוכחי.\n";
     }
 
     const callSummaryElement = document.querySelector('#section-summary .section-content p');
@@ -594,24 +607,24 @@ async function getCalendarSuggestions() {
     
     let prompt = `
         אתה AI המסייע בתכנון יומן. בהתבסס על סיכום השיחה הבא: "${callSummary}"
-        ועל רשימת המשימות הבאה של אהרון ליצירת קשר ותיאום פגישות:
-        ${aharonTasksText}
+        ועל רשימת המשימות הבאה שזוהו מהשיחה וקשורות פוטנציאלית לתיאום פגישות:
+        ${meetingTasksText}
     `;
     if (userProvidedContext) {
         prompt += `\n\nהקשר נוסף שסופק על ידי המשתמש ושחשוב להתייחס אליו בהצעות התזמון: "${userProvidedContext}"`;
     }
     prompt += `
-        אנא ספק הצעות תזמון מפורטות בעברית. עבור כל פגישה מרכזית שאהרון צריך לקבוע, ספק את הפרטים הבאים בפורמט JSON. כל אובייקט ב-JSON צריך לייצג פגישה ולהכיל את השדות: "contact_person_or_company", "suggested_title", "suggested_description", "priority" (למשל: "גבוהה", "בינונית", "רגילה"), "suggested_date" (בפורמט YYYY-MM-DD, אם ניתן להסיק או להציע באופן כללי, אחרת null), "suggested_time" (בפורמט HH:MM, אם ניתן, אחרת null), ו-"notes" (הערות נוספות כמו תלויות, קונפליקטים פוטנציאליים, או דחיפות).
+        אנא ספק הצעות תזמון מפורטות בעברית. עבור כל פגישה מרכזית שניתן להסיק מהמשימות, ספק את הפרטים הבאים בפורמט JSON. כל אובייקט ב-JSON צריך לייצג פגישה ולהכיל את השדות: "contact_person_or_company", "suggested_title", "suggested_description", "priority" (למשל: "גבוהה", "בינונית", "רגילה"), "suggested_date" (בפורמט YYYY-MM-DD, אם ניתן להסיק או להציע באופן כללי, אחרת null), "suggested_time" (בפורמט HH:MM, אם ניתן, אחרת null), ו-"notes" (הערות נוספות כמו תלויות, קונפליקטים פוטנציאליים, או דחיפות).
 
         דוגמה לאובייקט JSON עבור פגישה אחת:
         {
-            "contact_person_or_company": "נס מולטימדיה",
-            "suggested_title": "פגישת היכרות ובחינת שת\\"פ עם נס מולטימדיה",
-            "suggested_description": "דיון על המוצר שלנו לתמלול וניהול שיחות, ובחינת אפשרויות לשיתוף פעולה או כלקוח. משתתפים: אהרון, נציג נס מולטימדיה.",
-            "priority": "גבוהה",
+            "contact_person_or_company": "שם איש הקשר/חברה מהמשימה",
+            "suggested_title": "פגישה בנושא X עם Y",
+            "suggested_description": "מטרת הפגישה היא לדון ב... משתתפים: [שם המוקצה למשימה], נציג החברה.",
+            "priority": "בינונית",
             "suggested_date": null, 
             "suggested_time": null,
-            "notes": "קלמן הדגיש חשיבות גבוהה לקשר זה. יש לתאם בהקדם."
+            "notes": "יש לתאם בהקדם בהתאם לדחיפות המשימה."
         }
 
         החזר מערך של אובייקטים כאלה בפורמט JSON. הקפד על תקינות ה-JSON. אם אין משימות רלוונטיות לתזמון, החזר מערך JSON ריק.
@@ -684,13 +697,11 @@ async function reEvaluateAnalysis() {
     }
     
     const summaryElement = document.querySelector('#section-summary .section-content');
-    const aharonTasksElement = document.getElementById('aharon-tasks');
-    const kalmanDevTasksElement = document.getElementById('kalman-dev-tasks');
+    const allActionItemsElement = document.getElementById('all-action-items'); 
 
     const currentReportState = {
         executiveSummary: summaryElement ? summaryElement.innerHTML : "אין סיכום קיים.",
-        aharonTasks: aharonTasksElement ? Array.from(aharonTasksElement.querySelectorAll('li')).map(li => li.textContent.split('<button')[0].trim()) : [],
-        kalmanDevTasks: kalmanDevTasksElement ? Array.from(kalmanDevTasksElement.querySelectorAll('li')).map(li => li.textContent.trim()) : []
+        actionItems: allActionItemsElement ? Array.from(allActionItemsElement.querySelectorAll('li')).map(li => li.textContent.split('<button')[0].trim()) : []
     };
     
     openModal("🔄 עדכון ניתוח עם הקשר חדש");
@@ -703,28 +714,24 @@ async function reEvaluateAnalysis() {
         ${currentReportState.executiveSummary.replace(/<[^>]*>/g, ' ').substring(0, 500)}... 
         </סיכום_מקורי>
 
-        <משימות_אהרון_מקוריות>
-        ${currentReportState.aharonTasks.join('\n- ')}
-        </משימות_אהרון_מקוריות>
-
-        <משימות_קלמן_ודוות_מקוריות>
-        ${currentReportState.kalmanDevTasks.join('\n- ')}
-        </משימות_קלמן_ודוות_מקוריות>
+        <משימות_מקוריות>
+        ${currentReportState.actionItems.join('\n- ')}
+        </משימות_מקוריות>
 
         המשתמש הוסיף את ההקשר החדש הבא:
         <הקשר_חדש>
         ${newContext}
         </הקשר_חדש>
 
-        בהתבסס על כל המידע הזה (הניתוח המקורי וההקשר החדש), אנא ספק JSON מעודכן עבור סיכום המנהלים (executiveSummary) ורשימות המשימות (actionItems.forAharon, actionItems.forKalmanDev) בלבד, בהתאם למבנה ה-JSON המלא שצוין ב-"Advanced AI Call Transcription Analysis Prompt".
+        בהתבסס על כל המידע הזה (הניתוח המקורי וההקשר החדש), אנא ספק JSON מעודכן עבור סיכום המנהלים (executiveSummary) ורשימת המשימות הכללית (actionItems - כמערך של אובייקטים) בלבד, בהתאם למבנה ה-JSON המלא שצוין ב-"Advanced AI Call Transcription Analysis Prompt (General Purpose v2)".
         החזר רק את האובייקט JSON המכיל את השדות "executiveSummary" ו-"actionItems" המעודכנים.
         לדוגמה:
         {
           "executiveSummary": { "callType": "...", "mainPurpose": "...", ... },
-          "actionItems": {
-            "forAharon": [ { "taskDescription": "...", ... } ],
-            "forKalmanDev": [ { "taskDescription": "...", ... } ]
-          }
+          "actionItems": [ 
+            { "taskDescription": "משימה כללית 1", "assignedTo": "שם המשתתף/צוות", "impliedUrgency": "...", "contextReason": "..." },
+            { "taskDescription": "משימה כללית 2", "assignedTo": "שם אחר/צוות אחר", "impliedUrgency": "...", "contextReason": "..." }
+          ]
         }
         ודא שה-JSON תקין לחלוטין, ללא שגיאות תחביר כמו פסיקים מיותרים.
     `;
@@ -747,9 +754,8 @@ async function reEvaluateAnalysis() {
             summaryElement.innerHTML = summaryHTML;
         }
 
-        if (updatedData.actionItems) {
-            if(aharonTasksElement) aharonTasksElement.innerHTML = createActionListItems(updatedData.actionItems.forAharon, true);
-            if(kalmanDevTasksElement) kalmanDevTasksElement.innerHTML = createActionListItems(updatedData.actionItems.forKalmanDev, false);
+        if (updatedData.actionItems && allActionItemsElement) { 
+            allActionItemsElement.innerHTML = createGeneralActionListItems(updatedData.actionItems);
         }
 
         if(reevaluationStatus) {

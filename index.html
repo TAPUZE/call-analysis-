@@ -78,13 +78,8 @@
                 <div id="section-action-items" class="report-section">
                     <h2 data-collapsible><i class="fas fa-clipboard-list section-icon"></i>2. משימות ופעולות נדרשות (Next Steps)<i class="fas fa-chevron-down toggle-icon"></i></h2>
                     <div class="section-content">
-                        <h3>לאהרון (פיתוח עסקי ונטוורקינג):</h3>
-                        <ul id="aharon-tasks">
-                            <li class="text-gray-500 italic">משימות לאהרון יופיעו כאן...</li>
-                        </ul>
-                        <h3>לקלמן / צוות פיתוח וניהול:</h3>
-                        <ul id="kalman-dev-tasks">
-                             <li class="text-gray-500 italic">משימות לקלמן/צוות יופיעו כאן...</li>
+                        <ul id="all-action-items"> 
+                            <li class="text-gray-500 italic">משימות ופעולות יופיעו כאן...</li>
                         </ul>
                     </div>
                 </div>
@@ -218,15 +213,5 @@
 
     <script src="prompts.js"></script> 
     <script src="script.js"></script>
-    <script>
-        // This script block in index.html can be minimal.
-        // Most initialization should be handled within script.js's DOMContentLoaded listener.
-        // For example, if setupUIEventListeners() is defined in script.js and needs to be called
-        // after prompts.js and script.js are loaded, this is one place to do it.
-        // However, it's often cleaner to put all such logic in script.js itself.
-        // document.addEventListener('DOMContentLoaded', () => {
-        //    console.log("Main HTML DOM fully loaded and parsed. Prompts and Scripts should be available.");
-        // });
-    </script>
 </body>
 </html>

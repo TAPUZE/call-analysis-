@@ -1,0 +1,355 @@
+:root {
+    --primary: #2c3e50; 
+    --secondary: #3498db; 
+    --accent: #e74c3c; 
+    --light: #ecf0f1; 
+    --dark: #2c3e50; 
+    --success: #2ecc71; 
+    --warning: #f39c12; 
+    --danger: #e74c3c; 
+    --text-primary: #333; 
+    --text-secondary: #7f8c8d; 
+    --bg-main: #f8f9fa; 
+    --bg-white: #FFFFFF;
+    --border-color: #e5e7eb; 
+    --shadow: 0 4px 6px rgba(0, 0, 0, 0.1); 
+    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1); 
+    --radius: 8px; 
+    --radius-lg: 12px; 
+    --transition: all 0.3s ease; 
+}
+
+body { 
+    font-family: 'Rubik', 'Arial', sans-serif;
+    direction: rtl; 
+    background-color: var(--bg-main);
+    color: var(--text-primary);
+    line-height: 1.6;
+    margin: 0; /* Added to ensure no default browser margin */
+}
+
+/* --- Sidebar --- */
+#sidebar {
+    background: var(--primary); 
+    color: var(--light); 
+    transition: var(--transition);
+    z-index: 100; 
+    width: 250px; 
+    /* Ensure it's fixed and takes full height if that's the intention */
+    position: fixed; /* Added from previous combined file */
+    top: 0;
+    right: 0;
+    height: 100%;
+    box-shadow: var(--shadow-lg); /* Added from previous combined file */
+    overflow-y: auto; /* Added from previous combined file */
+}
+#sidebar.hidden-sidebar { transform: translateX(100%); } /* For RTL, to slide out to the right */
+
+@media (min-width: 1024px) { /* lg breakpoint */
+    #sidebar.hidden-sidebar { transform: translateX(0); } /* Keep visible on larger screens */
+    #main-content { margin-right: 250px;  } /* Adjust main content margin when sidebar is open */
+}
+
+.nav-link {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1.5rem; 
+    border-radius: var(--radius);
+    transition: var(--transition);
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.8); 
+    position: relative; /* Added for ::before positioning */
+    text-decoration: none; /* Ensure links are not underlined by default */
+}
+.nav-link i { margin-left: 10px; font-size: 1.1rem; width: 20px; text-align: center; } 
+.nav-link:hover { color: white; background: rgba(255, 255, 255, 0.1); } 
+.nav-link.active { color: white; background: var(--secondary) } 
+.nav-link.active::before { 
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 0;
+    height: 100%;
+    width: 4px;
+    background: var(--accent); 
+    border-radius: var(--radius) 0 0 var(--radius);
+}
+#sidebar-header { 
+    padding: 0 1.5rem 2rem; 
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1); 
+    margin-bottom: 1rem; 
+    /* Added from previous combined file */
+    padding-top: 1.5rem; /* pt-6 */
+}
+ #sidebar-header h1 { 
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: white;
+    display: flex;
+    align-items: center;
+}
+#sidebar-header h1 i { margin-left: 10px; color: var(--secondary); }
+
+
+/* --- Main Content & Sections --- */
+#main-header { 
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    background-color: var(--bg-white);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow);
+}
+#main-header h1 { font-size: 2rem; font-weight: 700; color: var(--primary); }
+#main-header p { color: var(--text-secondary); }
+
+.report-section { 
+    background: var(--bg-white);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow);
+    padding: 1.5rem; 
+    margin-bottom: 2rem;
+    transition: var(--transition);
+}
+.report-section:hover {
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-3px);
+}
+.report-section h2 { 
+    font-size: 1.3rem; 
+    font-weight: 600;
+    color: var(--primary);
+    margin-bottom: 1.5rem; 
+    padding-bottom: 1rem; 
+    border-bottom: 1px solid #eee; 
+    display: flex;
+    align-items: center;
+    cursor: pointer; 
+}
+.report-section h2 .section-icon { margin-left: 10px; color: var(--secondary); font-size: 1.1em; }
+.report-section h2 .toggle-icon { margin-right: auto; font-size: 0.8em; color: var(--text-secondary); transition: transform 0.3s ease; }
+.report-section.collapsed .section-content { display: none; }
+.report-section.collapsed h2 .toggle-icon { transform: rotate(-90deg); }
+
+.report-section h3 { 
+    font-size: 1.1rem; 
+    font-weight: 600;
+    color: var(--primary);
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--secondary);
+}
+ul { list-style-type: none; padding-right: 0; } 
+li { 
+    margin-bottom: 0.5rem; 
+    padding-right: 1.5rem; 
+    position: relative;
+    color: var(--text-primary); 
+}
+li::before { 
+    content: "•"; 
+    position: absolute;
+    right: 0; 
+    color: var(--primary); 
+    font-weight: bold;
+    font-size: 1.2em;
+    line-height: 1;
+}
+.priority-item { 
+    background-color: #EFF6FF; 
+    border-right: 4px solid var(--secondary); 
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border-radius: var(--radius);
+}
+.priority-item strong { color: var(--secondary); }
+
+/* --- Buttons --- */
+.action-button, .gemini-button, .calendar-button { 
+    padding: 0.6rem 1.2rem;
+    border: none;
+    border-radius: var(--radius);
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition);
+    box-shadow: var(--shadow);
+    background: var(--primary);
+    color: white;
+    margin-left: 0.5rem; 
+}
+.action-button i, .gemini-button i, .calendar-button i { margin-right: 8px; } 
+.action-button:hover, .gemini-button:hover, .calendar-button:hover { 
+    background: #34495e; 
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+.action-button.secondary { 
+    background: var(--secondary);
+}
+.action-button.secondary:hover {
+    background: #2980b9;
+}
+.gemini-button {
+    background: linear-gradient(135deg, var(--secondary) 0%, var(--success) 100%);
+    font-size: 0.9em;
+    padding: 0.4rem 0.8rem;
+}
+.gemini-button:hover {
+    opacity: 0.9;
+}
+.gemini-button i {
+     margin-right: 4px;
+}
+.calendar-button {
+    background: var(--warning);
+    font-size: 0.9em;
+    padding: 0.4rem 0.8rem;
+}
+ .calendar-button:hover {
+    background: #d0800c; /* Darker warning */
+}
+
+
+/* --- Table --- */
+table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 1.5rem; border: 1px solid #ddd; border-radius: var(--radius); overflow: hidden;}
+th, td { padding: 1rem; text-align: right; border-bottom: 1px solid #eee; }
+th { background-color: #f7f7f7; color: var(--primary); font-weight: 600; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background-color: #f0f5f9; }
+
+/* --- Hamburger Menu --- */
+#menu-button { 
+    z-index: 110; 
+    background-color: var(--primary); 
+    position: fixed; /* Added from previous combined file */
+    top: 1.5rem; /* 6 (24px) */
+    right: 1.5rem; /* 6 (24px) */
+    padding: 0.75rem; /* p-3 */
+    color: white; /* text-white */
+    border-radius: var(--radius); /* rounded-md */
+    box-shadow: var(--shadow-lg); /* shadow-lg */
+}
+#menu-button:hover { background-color: #34495e; }
+
+/* --- Modal Styling --- */
+.modal {
+    display: none; 
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0,0,0,0.5);
+    align-items: center;
+    justify-content: center;
+}
+.modal-content {
+    background-color: var(--bg-white);
+    margin: auto;
+    padding: 2rem;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    width: 90%;
+    max-width: 600px;
+    position: relative;
+    direction: rtl; 
+}
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 1rem;
+    margin-bottom: 1rem;
+}
+.modal-header h3 {
+    color: var(--primary);
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin: 0;
+}
+.close-button {
+    color: var(--text-secondary);
+    font-size: 1.8rem;
+    font-weight: bold;
+    cursor: pointer;
+    background: none;
+    border: none;
+}
+.close-button:hover { color: var(--dark); }
+.modal-body { max-height: 60vh; overflow-y: auto; white-space: pre-wrap; }
+.modal-footer {
+    padding-top: 1rem;
+    margin-top: 1rem;
+    border-top: 1px solid var(--border-color);
+    text-align: left;
+}
+.loading-indicator {
+    display: none; 
+    text-align: center;
+    padding: 1rem;
+}
+.loading-indicator i {
+    font-size: 2rem;
+    color: var(--secondary);
+    animation: spin 1s linear infinite;
+}
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+/* Context Input Area */
+.input-area textarea, .input-area input[type="password"], .input-area input[type="text"] {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    margin-bottom: 0.75rem;
+    font-size: 0.9rem;
+}
+ .input-area textarea { min-height: 150px; }
+
+
+/* Calendar Suggestion Item */
+.calendar-suggestion-item {
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 1rem;
+    margin-bottom: 1rem;
+    background-color: #f9fafb; /* Light gray background */
+}
+.calendar-suggestion-item h4 {
+    font-size: 1.1em;
+    font-weight: 600;
+    color: var(--primary);
+    margin-bottom: 0.5rem;
+}
+.calendar-suggestion-item p {
+    font-size: 0.95em;
+    color: var(--text-secondary);
+    margin-bottom: 0.25rem;
+}
+.calendar-suggestion-item .calendar-button {
+    margin-top: 0.75rem;
+}
+
+
+/* --- Print Styles --- */
+@media print {
+    body { font-family: 'Rubik', 'Arial', sans-serif !important; background-color: var(--bg-white); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    #sidebar, #menu-button, .download-buttons, .gemini-button, .modal, #context-area, #calendar-ai-section .gemini-button, .calendar-button, #api-key-section, #transcription-input-section { display: none !important; }
+    #main-content { margin-right: 0 !important; width: 100% !important; padding: 0 !important; }
+    .report-section { border: 1px solid #ccc !important; box-shadow: none; padding: 1.5rem; margin-bottom: 1rem; page-break-inside: avoid; }
+    #main-header { background: none !important; color: var(--text-primary) !important; text-align: right !important; padding: 1rem 0 !important; box-shadow: none; }
+    #main-header h1 { font-size: 2em !important; }
+    #main-header p { font-size: 1em !important; }
+    .report-section.collapsed .section-content { display: block !important; } 
+    .report-section h2 .toggle-icon { display: none; } 
+    table, th, td { border: 1px solid #999 !important; }
+    th { background-color: #eee !important; }
+    li::before { color: #555 !important; }
+}

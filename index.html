@@ -69,15 +69,33 @@
                 </div>
 
                 <div id="section-summary" class="report-section">
-                    <h2 data-collapsible><i class="fas fa-file-invoice-dollar section-icon"></i>1. סיכום מנהלים ותובנות מפתח<i class="fas fa-chevron-down toggle-icon"></i></h2>
-                    <div class="section-content">
+                    <div class="flex justify-between items-center mb-2">
+                        <h2 data-collapsible class="!mb-0 !border-b-0 flex-grow"><i class="fas fa-file-invoice-dollar section-icon"></i>1. סיכום מנהלים ותובנות מפתח<i class="fas fa-chevron-down toggle-icon"></i></h2>
+                        <div class="version-controls flex items-center space-x-1 space-x-reverse">
+                            <button onclick="approveAiChanges('summary')" id="approveSummaryAiChanges" class="gemini-button success text-xs !py-1 !px-2 hidden" title="אשר שינויי AI"><i class="fas fa-check-circle"></i> אשר AI</button>
+                            <button onclick="saveVersion('summary')" class="gemini-button text-xs !py-1 !px-2" title="שמור גרסה נוכחית"><i class="fas fa-save"></i> שמור</button>
+                            <button onclick="loadVersion('summary', 'prev')" id="prevSummaryVersion" class="action-button text-xs !py-1 !px-2" title="גרסה קודמת" disabled><i class="fas fa-arrow-right"></i></button>
+                            <span id="summaryVersionInfo" class="text-xs text-gray-500 mx-1">גרסה -/-</span>
+                            <button onclick="loadVersion('summary', 'next')" id="nextSummaryVersion" class="action-button text-xs !py-1 !px-2" title="גרסה הבאה" disabled><i class="fas fa-arrow-left"></i></button>
+                        </div>
+                    </div>
+                    <div class="section-content" id="summary-content-area">
                         <p class="mb-3 text-gray-500 italic">הסיכום יופיע כאן לאחר ניתוח התמלול...</p>
                     </div>
                 </div>
                 
                 <div id="section-action-items" class="report-section">
-                    <h2 data-collapsible><i class="fas fa-clipboard-list section-icon"></i>2. משימות ופעולות נדרשות (Next Steps)<i class="fas fa-chevron-down toggle-icon"></i></h2>
-                    <div class="section-content">
+                     <div class="flex justify-between items-center mb-2">
+                        <h2 data-collapsible class="!mb-0 !border-b-0 flex-grow"><i class="fas fa-clipboard-list section-icon"></i>2. משימות ופעולות נדרשות (Next Steps)<i class="fas fa-chevron-down toggle-icon"></i></h2>
+                        <div class="version-controls flex items-center space-x-1 space-x-reverse">
+                            <button onclick="approveAiChanges('actionItems')" id="approveActionItemsAiChanges" class="gemini-button success text-xs !py-1 !px-2 hidden" title="אשר שינויי AI"><i class="fas fa-check-circle"></i> אשר AI</button>
+                            <button onclick="saveVersion('actionItems')" class="gemini-button text-xs !py-1 !px-2" title="שמור גרסה נוכחית"><i class="fas fa-save"></i> שמור</button>
+                            <button onclick="loadVersion('actionItems', 'prev')" id="prevActionItemsVersion" class="action-button text-xs !py-1 !px-2" title="גרסה קודמת" disabled><i class="fas fa-arrow-right"></i></button>
+                            <span id="actionItemsVersionInfo" class="text-xs text-gray-500 mx-1">גרסה -/-</span>
+                            <button onclick="loadVersion('actionItems', 'next')" id="nextActionItemsVersion" class="action-button text-xs !py-1 !px-2" title="גרסה הבאה" disabled><i class="fas fa-arrow-left"></i></button>
+                        </div>
+                    </div>
+                    <div class="section-content" id="action-items-content-area">
                         <ul id="all-action-items"> 
                             <li class="text-gray-500 italic">משימות ופעולות יופיעו כאן...</li>
                         </ul>

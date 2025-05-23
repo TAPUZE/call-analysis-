@@ -1170,6 +1170,4 @@ window.onclick = function(event) {
     if (modal && event.target == modal) { 
         closeModal();
     }
-}; // Added semicolon here
-// Make sure this is the very last part of the script.
-// No code, not even comments, should follow this line in this specific file.
+};

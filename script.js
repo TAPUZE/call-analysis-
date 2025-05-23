@@ -206,7 +206,8 @@ function setAIPendingState(sectionKey, contentHTML) {
         contentArea.innerHTML = contentHTML; 
         contentArea.classList.add('ai-updated-pending-save');
         contentArea.style.animation = 'none';
-        contentArea.offsetHeight; 
+        // void contentArea.offsetWidth; // Corrected: Use void to ensure reflow is triggered
+        contentArea.offsetHeight; // Simpler way to trigger reflow
         contentArea.style.animation = 'pulse-bg 2s infinite';
     }
     if (approveButton) {
@@ -422,18 +423,16 @@ function populateReportWithData(data) {
             const taskDescLower = (item.taskDescription || "").toLowerCase();
             const assignedToLower = (item.assignedTo || "").toLowerCase();
             
-            // More generic check for email draft button - if assignedTo seems like a person's name
-            // This is a heuristic and might need adjustment based on typical 'assignedTo' values.
-            const genericAssignments = ["צוות", "ללא הקצאה", "פנימי", "לקוח"];
-            let offerEmailButton = true;
-            genericAssignments.forEach(generic => {
-                if (assignedToLower.includes(generic)) {
-                    offerEmailButton = false;
+            const assigneesToOfferEmail = ["אתי", "משה", "אהרון", "קלמן"]; 
+            let isPersonAssigned = false;
+            assigneesToOfferEmail.forEach(name => {
+                if (assignedToLower.includes(name.toLowerCase())) {
+                    isPersonAssigned = true;
                 }
             });
             
-            if ( (taskDescLower.includes('פנייה ל') || taskDescLower.includes('יצירת קשר עם') || taskDescLower.includes('תיאום עם') || offerEmailButton) && 
-                 assignedTo.trim() !== "" && !assignedToLower.includes('לא הוקצה')) {
+            if ( (taskDescLower.includes('פנייה ל') || taskDescLower.includes('יצירת קשר עם') || taskDescLower.includes('תיאום עם') || isPersonAssigned) && 
+                 assignedTo.trim() !== "" && !assignedToLower.includes('צוות') && !assignedToLower.includes('ללא הקצאה')) {
                 let taskContext = item.contextReason || item.taskDescription.split('עם ')[1] || item.taskDescription; 
                 taskHTML += ` <button class="gemini-button ml-2" data-task-context="${taskContext.split('.')[0].trim().replace(/"/g, '&quot;')}" data-assigned-to="${assignedTo}" onclick="generateEmailDraft(this)"><i class="fas fa-wand-magic-sparkles"></i> הפק טיוטת מייל</button>`;
             }
@@ -468,7 +467,7 @@ function populateReportWithData(data) {
          summaryContentArea.innerHTML = '<p class="text-gray-500 italic">סיכום לא זמין.</p>';
     }
     showSectionIfPopulated('section-summary', summaryPopulated);
-    if (summaryPopulated) saveVersion('summary', summaryContentArea.innerHTML);
+    if (summaryPopulated && summaryContentArea) saveVersion('summary', summaryContentArea.innerHTML);
 
 
     // II. Action Items
@@ -557,10 +556,14 @@ function populateReportWithData(data) {
         const concernsSectionContent = document.querySelector('#section-key-concerns .section-content');
         if (concernsSectionContent) {
             if (concernsPopulated) {
-                concernsSectionContent.innerHTML = concernsHTML;
+                // Temporarily remove the button to avoid duplicating it
+                const existingButton = concernsSectionContent.querySelector('.gemini-button');
+                if (existingButton) existingButton.remove();
+                concernsSectionContent.innerHTML = concernsHTML; // Set the list content
             } else {
                 concernsSectionContent.innerHTML = '<ul id="concerns-list"><li class="text-gray-500 italic">אין חששות מרכזיים.</li></ul>';
             }
+            // Always ensure the button is there if the section is shown (or if it's meant to be always there)
             if (!concernsSectionContent.querySelector('.gemini-button')) {
                 const button = document.createElement('button');
                 button.className = 'gemini-button mt-4';
@@ -570,7 +573,7 @@ function populateReportWithData(data) {
              }
         }
 
-    } else if (concernsListElement) { // Should be concernsSectionContent
+    } else if (concernsListElement) { 
          const concernsSectionContentFallback = document.querySelector('#section-key-concerns .section-content');
          if(concernsSectionContentFallback) {
             concernsSectionContentFallback.innerHTML = '<ul id="concerns-list"><li class="text-gray-500 italic">אין חששות מרכזיים.</li></ul> <button class="gemini-button mt-4" onclick="suggestSolutions()"><i class="fas fa-wand-magic-sparkles"></i> הצע פתרונות לאתגרים</button>';
@@ -890,4 +893,283 @@ async function getCalendarSuggestions() {
         prompt += `\n\nהקשר נוסף שסופק על ידי המשתמש ושחשוב להתייחס אליו בהצעות התזמון: "${userProvidedContext}"`;
     }
     prompt += `
-        אנא ספק הצעות תזמון מפורטות בעברית. עבור כל פגישה מרכזית שניתן להסיק מהמשימות, ספק את הפרטים הבאים בפורמט JSON. כל אובייקט ב-JSON צריך לייצג פגישה ולהכיל את השדות: "contact_person_or_company", "suggested_title", "suggested_description", "priority" (למשל: "גבוהה", "בינונית", "רגילה"), "suggested_date" (בפו
+        אנא ספק הצעות תזמון מפורטות בעברית. עבור כל פגישה מרכזית שניתן להסיק מהמשימות, ספק את הפרטים הבאים בפורמט JSON. כל אובייקט ב-JSON צריך לייצג פגישה ולהכיל את השדות: "contact_person_or_company", "suggested_title", "suggested_description", "priority" (למשל: "גבוהה", "בינונית", "רגילה"), "suggested_date" (בפורמט YYYY-MM-DD, אם ניתן להסיק או להציע באופן כללי, אחרת null), "suggested_time" (בפורמט HH:MM, אם ניתן, אחרת null), ו-"notes" (הערות נוספות כמו תלויות, קונפליקטים פוטנציאליים, או דחיפות).
+
+        דוגמה לאובייקט JSON עבור פגישה אחת:
+        {
+            "contact_person_or_company": "שם איש הקשר/חברה מהמשימה",
+            "suggested_title": "פגישה בנושא X עם Y",
+            "suggested_description": "מטרת הפגישה היא לדון ב... משתתפים: [שם המוקצה למשימה], נציג החברה.",
+            "priority": "בינונית",
+            "suggested_date": null, 
+            "suggested_time": null,
+            "notes": "יש לתאם בהקדם בהתאם לדחיפות המשימה."
+        }
+
+        החזר מערך של אובייקטים כאלה בפורמט JSON. הקפד על תקינות ה-JSON. אם אין משימות רלוונטיות לתזמון, החזר מערך JSON ריק.
+    `;
+    
+    let jsonStringForParsing = "";
+    try {
+        jsonStringForParsing = await callGeminiAPI(prompt, true); 
+        if(calendarSuggestionsContent) calendarSuggestionsContent.innerHTML = ''; 
+        const suggestionsArray = JSON.parse(jsonStringForParsing); 
+
+        if (Array.isArray(suggestionsArray) && suggestionsArray.length > 0) {
+            suggestionsArray.forEach(event => {
+                const eventDiv = document.createElement('div');
+                eventDiv.className = 'calendar-suggestion-item';
+                
+                let eventHTML = `<h4>${(event.suggested_title || `פגישה עם ${event.contact_person_or_company}`).replace(/</g, "&lt;").replace(/>/g, "&gt;")}</h4>`;
+                eventHTML += `<p><strong>תיאור:</strong> ${(event.suggested_description || 'אין תיאור זמין').replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>`;
+                if(event.priority) eventHTML += `<p><strong>עדיפות:</strong> ${event.priority.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>`;
+                if(event.suggested_date) eventHTML += `<p><strong>תאריך מוצע:</strong> ${event.suggested_date.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>`;
+                if(event.suggested_time) eventHTML += `<p><strong>שעה מוצעת:</strong> ${event.suggested_time.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>`;
+                if(event.notes) eventHTML += `<p><strong>הערות:</strong> ${event.notes.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>`;
+
+                let startDateForLink, endDateForLink;
+                if (event.suggested_date && event.suggested_time) {
+                    try {
+                        const [hours, minutes] = event.suggested_time.split(':').map(Number);
+                        const d = new Date(event.suggested_date);
+                        d.setHours(hours, minutes);
+                        startDateForLink = d;
+                        endDateForLink = new Date(d.getTime() + 60 * 60 * 1000); 
+                    } catch (e) { /* Fallback handled by generateGoogleCalendarLink */ }
+                }
+                
+                const gCalLink = generateGoogleCalendarLink(
+                    event.suggested_title || `פגישה עם ${event.contact_person_or_company}`,
+                    startDateForLink, 
+                    endDateForLink,
+                    event.suggested_description || '',
+                    '' 
+                );
+
+                eventHTML += `<a href="${gCalLink}" target="_blank" class="calendar-button"><i class="fab fa-google"></i> הוסף ליומן Google</a>`;
+                eventDiv.innerHTML = eventHTML;
+                if(calendarSuggestionsContent) calendarSuggestionsContent.appendChild(eventDiv);
+            });
+        } else {
+             if(calendarSuggestionsContent) calendarSuggestionsContent.innerHTML = '<p class="text-gray-500 italic">לא נמצאו הצעות תזמון ספציפיות מה-AI.</p>';
+        }
+    } catch (error) {
+        console.error("Error in getCalendarSuggestions:", error);
+        console.error("Problematic JSON string for calendar suggestions:", jsonStringForParsing);
+        if(calendarSuggestionsContent) calendarSuggestionsContent.innerHTML = `<p class="text-red-500">אירעה שגיאה בקבלת הצעות תזמון: ${error.message}. בדוק את הקונסול.</p>`;
+    }
+}
+
+async function reEvaluateAnalysis() {
+    const newContext = additionalContextInput ? additionalContextInput.value.trim() : "";
+    if (!newContext) {
+        if(reevaluationStatus) {
+            reevaluationStatus.textContent = "אנא הזן הקשר נוסף.";
+            reevaluationStatus.className = "mt-3 text-sm text-yellow-600";
+        }
+        return;
+    }
+
+    if(reevaluationStatus) {
+        reevaluationStatus.textContent = "מעדכן ניתוח...";
+        reevaluationStatus.className = "mt-3 text-sm text-blue-600";
+    }
+    
+    const summaryContentArea = document.getElementById('summary-content-area');
+    const actionItemsContentArea = document.getElementById('action-items-content-area'); 
+    
+    const currentSummaryText = summaryContentArea ? summaryContentArea.innerText : "אין סיכום קיים.";
+    const currentActionItemsUl = document.getElementById('all-action-items');
+    const currentActionItemsText = currentActionItemsUl ? Array.from(currentActionItemsUl.querySelectorAll('li')).map(li => li.textContent.split('<button')[0].trim()).join('\n- ') : "אין משימות קיימות.";
+
+
+    openModal("🔄 עדכון ניתוח עם הקשר חדש");
+
+    const prompt = `
+        אתה AI המסייע בעדכון ניתוח שיחה קיים בהתבסס על הקשר חדש שסופק על ידי המשתמש.
+        
+        הניתוח המקורי (בקיצור) הוא:
+        <סיכום_מקורי>
+        ${currentSummaryText.substring(0, 700)}... 
+        </סיכום_מקורי>
+
+        <משימות_מקוריות>
+        - ${currentActionItemsText}
+        </משימות_מקוריות>
+
+        המשתמש הוסיף את ההקשר החדש הבא:
+        <הקשר_חדש>
+        ${newContext}
+        </הקשר_חדש>
+
+        בהתבסס על כל המידע הזה (הניתוח המקורי וההקשר החדש), אנא ספק JSON מעודכן עבור סיכום המנהלים (executiveSummary) ורשימת המשימות הכללית (actionItems - כמערך של אובייקטים) בלבד, בהתאם למבנה ה-JSON המלא שצוין ב-"Advanced AI Call Transcription Analysis Prompt (General Purpose v2)".
+        החזר רק את האובייקט JSON המכיל את השדות "executiveSummary" ו-"actionItems" המעודכנים.
+        לדוגמה:
+        {
+          "executiveSummary": { "callType": "...", "mainPurpose": "...", ... },
+          "actionItems": [ 
+            { "taskDescription": "משימה כללית 1", "assignedTo": "שם המשתתף/צוות", "impliedUrgency": "...", "contextReason": "..." },
+            { "taskDescription": "משימה כללית 2", "assignedTo": "שם אחר/צוות אחר", "impliedUrgency": "...", "contextReason": "..." }
+          ]
+        }
+        ודא שה-JSON תקין לחלוטין, ללא שגיאות תחביר כמו פסיקים מיותרים.
+    `;
+    let jsonResponseForReval = "";
+    try {
+        jsonResponseForReval = await callGeminiAPI(prompt, true); 
+        const updatedData = JSON.parse(jsonResponseForReval);
+
+        if (updatedData.executiveSummary && summaryContentArea) {
+            // Save current state BEFORE updating
+            saveVersion('summary', summaryContentArea.innerHTML); 
+            const es = updatedData.executiveSummary;
+            let summaryHTML = `<p class="mb-2"><strong>סוג שיחה:</strong> ${es.callType || 'לא צוין'}</p>`;
+            summaryHTML += `<p class="mb-2"><strong>מטרה עיקרית:</strong> ${es.mainPurpose || 'לא צוין'}</p>`;
+            if (es.keyOutcomesAndDecisions && es.keyOutcomesAndDecisions.length > 0) {
+                summaryHTML += `<p class="mb-1"><strong>החלטות ותוצאות מפתח:</strong></p><ul class="list-disc pr-5">${es.keyOutcomesAndDecisions.map(item => `<li>${item.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</li>`).join('')}</ul>`;
+            }
+            if (es.criticalRoadblocks && es.criticalRoadblocks.length > 0) {
+                summaryHTML += `<p class="mt-2 mb-1"><strong>חסמים/אתגרים קריטיים:</strong></p><ul class="list-disc pr-5">${es.criticalRoadblocks.map(item => `<li>${item.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</li>`).join('')}</ul>`;
+            }
+            summaryHTML += `<p class="mt-2"><strong>סנטימנט כללי:</strong> ${es.overallSentiment || 'לא צוין'}</p>`;
+            setAIPendingState('summary', summaryHTML);
+        }
+
+        const allActionItemsUl = document.getElementById('all-action-items');
+        if (updatedData.actionItems && allActionItemsUl && actionItemsContentArea) { 
+            // Save current state BEFORE updating
+            saveVersion('actionItems', actionItemsContentArea.innerHTML); 
+            const newActionItemsHTML = createGeneralActionListItems(updatedData.actionItems);
+            // The setAIPendingState for actionItems expects the full content of action-items-content-area
+            setAIPendingState('actionItems', `<ul id="all-action-items">${newActionItemsHTML}</ul>`);
+        }
+
+        if(reevaluationStatus) {
+            reevaluationStatus.textContent = "הניתוח עודכן וממתין לאישורך (ראה הדגשה צהובה).";
+            reevaluationStatus.className = "mt-3 text-sm text-yellow-600";
+        }
+        closeModal(); 
+
+    } catch (error) {
+        console.error("Error re-evaluating analysis:", error);
+        console.error("Problematic JSON string for re-evaluation:", jsonResponseForReval);
+        if(geminiResponseContent) geminiResponseContent.textContent = '';
+        if(geminiError) {
+            geminiError.textContent = `אירעה שגיאה בעדכון הניתוח: ${error.message}. בדוק קונסול.`;
+            geminiError.style.display = 'block';
+        }
+        if(reevaluationStatus) {
+            reevaluationStatus.textContent = "שגיאה בעדכון הניתוח.";
+            reevaluationStatus.className = "mt-3 text-sm text-red-500";
+        }
+         if(geminiLoadingIndicator) geminiLoadingIndicator.style.display = 'none'; 
+    }
+}
+
+// --- UI Interactions (Sidebar, Collapsible sections) ---
+function setupUIEventListeners() {
+    const uiSidebar = document.getElementById('sidebar');
+    const uiMenuButton = document.getElementById('menu-button');
+    
+    if (uiMenuButton && uiSidebar) {
+        uiMenuButton.addEventListener('click', () => {
+            uiSidebar.classList.toggle('hidden-sidebar');
+        });
+    }
+    
+    document.querySelectorAll('#report-navigation .nav-link').forEach(link => {
+        link.addEventListener('click', (e) => {
+            if (window.innerWidth < 1024 && uiSidebar) { 
+                uiSidebar.classList.add('hidden-sidebar');
+            }
+            document.querySelectorAll('#report-navigation .nav-link').forEach(navLink => navLink.classList.remove('active'));
+            link.classList.add('active');
+            const targetId = link.getAttribute('href');
+            if (targetId && targetId.startsWith('#')) {
+                const targetElement = document.querySelector(targetId);
+                if (targetElement) {
+                    // targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }
+        });
+    });
+
+    document.querySelectorAll('h2[data-collapsible]').forEach(header => {
+        header.addEventListener('click', () => {
+            const section = header.closest('.report-section');
+            if (section) section.classList.toggle('collapsed');
+        });
+    });
+
+    const uiNavLinks = document.querySelectorAll('#report-navigation a');
+    const uiSections = document.querySelectorAll('.report-section');
+    let uiScrollTimeout;
+
+    window.addEventListener('scroll', () => {
+        clearTimeout(uiScrollTimeout);
+        uiScrollTimeout = setTimeout(() => { 
+            let current = '';
+            uiSections.forEach(section => {
+                if (section) { 
+                    const sectionTop = section.offsetTop;
+                    const sectionHeight = section.offsetHeight;
+                    if (pageYOffset >= sectionTop - (window.innerHeight / 3) && pageYOffset < sectionTop + sectionHeight - (window.innerHeight / 3)) {
+                        current = section.getAttribute('id');
+                    }
+                }
+            });
+
+            uiNavLinks.forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href') && link.getAttribute('href').substring(1) === current) {
+                    link.classList.add('active');
+                }
+            });
+            if (!current && uiNavLinks.length > 0 && uiSections.length > 0 && uiSections[0] && pageYOffset < uiSections[0].offsetTop) {
+                 if(uiNavLinks[0]) uiNavLinks[0].classList.add('active'); 
+            }
+        }, 100); 
+    });
+
+    if (uiNavLinks.length > 0 && uiSections.length > 0) {
+        let activeFoundOnLoad = false;
+        uiSections.forEach(section => {
+             if (section) { 
+                const sectionTop = section.offsetTop;
+                const sectionHeight = section.offsetHeight;
+                 if (pageYOffset >= sectionTop - 80 && pageYOffset < sectionTop + sectionHeight - 80) { 
+                    const activeLink = document.querySelector(`#report-navigation a[href="#${section.id}"]`);
+                    if(activeLink) {
+                        activeLink.classList.add('active');
+                        activeFoundOnLoad = true;
+                    }
+                }
+            }
+        });
+        if (!activeFoundOnLoad && uiNavLinks[0] && uiSections[0] && pageYOffset < uiSections[0].offsetTop) { 
+             if(uiNavLinks[0]) uiNavLinks[0].classList.add('active');
+        }
+    }
+}
+// CSV Data (Placeholder - will be populated by populateReportWithData)
+const csvDataPoints = [
+    ["קטגוריה", "פרט"]
+];
+
+// Event listener for closing modal with Escape key
+window.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape' || event.key === 'Esc') {
+        if (modal && modal.style.display === 'flex') {
+            closeModal();
+        }
+    }
+});
+
+// Close modal if clicked outside of modal-content
+window.onclick = function(event) {
+    if (modal && event.target == modal) { 
+        closeModal();
+    }
+}; // Added semicolon here
+// Make sure this is the very last part of the script.
+// No code, not even comments, should follow this line in this specific file.

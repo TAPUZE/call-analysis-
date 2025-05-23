@@ -45,13 +45,16 @@ document.addEventListener('DOMContentLoaded', () => {
             processingStatus.textContent = "שגיאה קריטית: קובץ ההנחיות (prompts.js) לא נטען כראוי או שהמשתנה advancedAnalysisPrompt אינו מוגדר בו. בדוק את הקונסול.";
             processingStatus.className = "mt-3 text-sm text-red-500 font-bold";
         } else {
-            alert("שגיאה קריטית בטעינת הנחיות AI. בדוק את הקונסול.");
+            // Fallback if processingStatus itself isn't found (though it should be)
+            const errorDiv = document.createElement('div');
+            errorDiv.className = "mt-3 text-sm text-red-500 font-bold p-4 bg-red-100 border border-red-400 rounded";
+            errorDiv.textContent = "שגיאה קריטית: קובץ ההנחיות (prompts.js) לא נטען כראוי. בדוק את הקונסול.";
+            document.body.insertBefore(errorDiv, document.body.firstChild);
         }
     }
 
     loadApiKey();
     setupUIEventListeners();
-    // Initialize version UI for sections that support it
     updateVersionUI('summary');
     updateVersionUI('actionItems');
 });
@@ -124,7 +127,6 @@ function saveVersion(sectionKey, contentToSave = null) {
         }
         updateVersionUI(sectionKey);
         clearAIPendingState(sectionKey); 
-        // console.log(`Version saved for ${sectionKey}. History length: ${versionHistory[sectionKey].length}, Current index: ${currentVersionIndex[sectionKey]}`);
     }
 }
 
@@ -243,7 +245,9 @@ function approveAiChanges(sectionKey) {
         updateVersionUI(sectionKey); 
         const currentVersionText = statusEl.textContent; 
         statusEl.textContent = `שינויי AI אושרו (${currentVersionText})`;
-        setTimeout(() => { statusEl.textContent = currentVersionText; }, 2500);
+        setTimeout(() => { 
+            if (statusEl) statusEl.textContent = currentVersionText; 
+        }, 2500);
     }
 }
 
@@ -418,16 +422,18 @@ function populateReportWithData(data) {
             const taskDescLower = (item.taskDescription || "").toLowerCase();
             const assignedToLower = (item.assignedTo || "").toLowerCase();
             
-            const assigneesToOfferEmail = ["אתי", "משה", "אהרון", "קלמן"]; 
-            let isPersonAssigned = false;
-            assigneesToOfferEmail.forEach(name => {
-                if (assignedToLower.includes(name.toLowerCase())) {
-                    isPersonAssigned = true;
+            // More generic check for email draft button - if assignedTo seems like a person's name
+            // This is a heuristic and might need adjustment based on typical 'assignedTo' values.
+            const genericAssignments = ["צוות", "ללא הקצאה", "פנימי", "לקוח"];
+            let offerEmailButton = true;
+            genericAssignments.forEach(generic => {
+                if (assignedToLower.includes(generic)) {
+                    offerEmailButton = false;
                 }
             });
             
-            if ( (taskDescLower.includes('פנייה ל') || taskDescLower.includes('יצירת קשר עם') || taskDescLower.includes('תיאום עם') || isPersonAssigned) && 
-                 !assignedToLower.includes('צוות') && !assignedToLower.includes('ללא הקצאה') && assignedTo.trim() !== "" ) {
+            if ( (taskDescLower.includes('פנייה ל') || taskDescLower.includes('יצירת קשר עם') || taskDescLower.includes('תיאום עם') || offerEmailButton) && 
+                 assignedTo.trim() !== "" && !assignedToLower.includes('לא הוקצה')) {
                 let taskContext = item.contextReason || item.taskDescription.split('עם ')[1] || item.taskDescription; 
                 taskHTML += ` <button class="gemini-button ml-2" data-task-context="${taskContext.split('.')[0].trim().replace(/"/g, '&quot;')}" data-assigned-to="${assignedTo}" onclick="generateEmailDraft(this)"><i class="fas fa-wand-magic-sparkles"></i> הפק טיוטת מייל</button>`;
             }
@@ -547,7 +553,7 @@ function populateReportWithData(data) {
             concernsHTML += '<h3 class="mt-4">סיכונים/אתגרים שנדונו:</h3><ul>' + createListItems(data.keyConcerns.risksOrChallengesDiscussed) + '</ul>';
             concernsPopulated = true;
         }
-        // Ensure the parent .section-content is updated, then re-add button if needed
+        
         const concernsSectionContent = document.querySelector('#section-key-concerns .section-content');
         if (concernsSectionContent) {
             if (concernsPopulated) {
@@ -555,15 +561,20 @@ function populateReportWithData(data) {
             } else {
                 concernsSectionContent.innerHTML = '<ul id="concerns-list"><li class="text-gray-500 italic">אין חששות מרכזיים.</li></ul>';
             }
-            // Always ensure the button is there if the section is shown (or if it's meant to be always there)
             if (!concernsSectionContent.querySelector('.gemini-button')) {
                 const button = document.createElement('button');
                 button.className = 'gemini-button mt-4';
                 button.onclick = suggestSolutions;
                 button.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> הצע פתרונות לאתגרים';
                 concernsSectionContent.appendChild(button);
-            }
+             }
         }
+
+    } else if (concernsListElement) { // Should be concernsSectionContent
+         const concernsSectionContentFallback = document.querySelector('#section-key-concerns .section-content');
+         if(concernsSectionContentFallback) {
+            concernsSectionContentFallback.innerHTML = '<ul id="concerns-list"><li class="text-gray-500 italic">אין חששות מרכזיים.</li></ul> <button class="gemini-button mt-4" onclick="suggestSolutions()"><i class="fas fa-wand-magic-sparkles"></i> הצע פתרונות לאתגרים</button>';
+         }
     }
     showSectionIfPopulated('section-key-concerns', concernsPopulated);
 

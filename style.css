@@ -17,6 +17,8 @@
     --radius: 8px; 
     --radius-lg: 12px; 
     --transition: all 0.3s ease; 
+    --ai-pending-bg: #fffbeb; /* Yellow-50 for pending AI changes */
+    --ai-pending-border: #facc15; /* Yellow-400 for pending AI changes border */
 }
 
 body { 
@@ -25,7 +27,7 @@ body {
     background-color: var(--bg-main);
     color: var(--text-primary);
     line-height: 1.6;
-    margin: 0; /* Added to ensure no default browser margin */
+    margin: 0; 
 }
 
 /* --- Sidebar --- */
@@ -35,19 +37,18 @@ body {
     transition: var(--transition);
     z-index: 100; 
     width: 250px; 
-    /* Ensure it's fixed and takes full height if that's the intention */
-    position: fixed; /* Added from previous combined file */
+    position: fixed; 
     top: 0;
     right: 0;
     height: 100%;
-    box-shadow: var(--shadow-lg); /* Added from previous combined file */
-    overflow-y: auto; /* Added from previous combined file */
+    box-shadow: var(--shadow-lg); 
+    overflow-y: auto; 
 }
-#sidebar.hidden-sidebar { transform: translateX(100%); } /* For RTL, to slide out to the right */
+#sidebar.hidden-sidebar { transform: translateX(100%); } 
 
 @media (min-width: 1024px) { /* lg breakpoint */
-    #sidebar.hidden-sidebar { transform: translateX(0); } /* Keep visible on larger screens */
-    #main-content { margin-right: 250px;  } /* Adjust main content margin when sidebar is open */
+    #sidebar.hidden-sidebar { transform: translateX(0); } 
+    #main-content { margin-right: 250px;  } 
 }
 
 .nav-link {
@@ -58,8 +59,8 @@ body {
     transition: var(--transition);
     font-weight: 500;
     color: rgba(255, 255, 255, 0.8); 
-    position: relative; /* Added for ::before positioning */
-    text-decoration: none; /* Ensure links are not underlined by default */
+    position: relative; 
+    text-decoration: none; 
 }
 .nav-link i { margin-left: 10px; font-size: 1.1rem; width: 20px; text-align: center; } 
 .nav-link:hover { color: white; background: rgba(255, 255, 255, 0.1); } 
@@ -78,8 +79,7 @@ body {
     padding: 0 1.5rem 2rem; 
     border-bottom: 1px solid rgba(255, 255, 255, 0.1); 
     margin-bottom: 1rem; 
-    /* Added from previous combined file */
-    padding-top: 1.5rem; /* pt-6 */
+    padding-top: 1.5rem; 
 }
  #sidebar-header h1 { 
     font-size: 1.5rem;
@@ -202,6 +202,12 @@ li::before {
 .gemini-button i {
      margin-right: 4px;
 }
+.gemini-button.success { /* For approve button */
+    background: var(--success);
+}
+.gemini-button.success:hover {
+    background: #27ae60; /* Darker success */
+}
 .calendar-button {
     background: var(--warning);
     font-size: 0.9em;
@@ -223,13 +229,13 @@ tr:hover td { background-color: #f0f5f9; }
 #menu-button { 
     z-index: 110; 
     background-color: var(--primary); 
-    position: fixed; /* Added from previous combined file */
-    top: 1.5rem; /* 6 (24px) */
-    right: 1.5rem; /* 6 (24px) */
-    padding: 0.75rem; /* p-3 */
-    color: white; /* text-white */
-    border-radius: var(--radius); /* rounded-md */
-    box-shadow: var(--shadow-lg); /* shadow-lg */
+    position: fixed; 
+    top: 1.5rem; 
+    right: 1.5rem; 
+    padding: 0.75rem; 
+    color: white; 
+    border-radius: var(--radius); 
+    box-shadow: var(--shadow-lg); 
 }
 #menu-button:hover { background-color: #34495e; }
 
@@ -320,7 +326,7 @@ tr:hover td { background-color: #f0f5f9; }
     border-radius: var(--radius);
     padding: 1rem;
     margin-bottom: 1rem;
-    background-color: #f9fafb; /* Light gray background */
+    background-color: #f9fafb; 
 }
 .calendar-suggestion-item h4 {
     font-size: 1.1em;
@@ -337,11 +343,25 @@ tr:hover td { background-color: #f0f5f9; }
     margin-top: 0.75rem;
 }
 
+/* AI Update Pending Save Styling */
+.ai-updated-pending-save {
+    background-color: var(--ai-pending-bg) !important; /* Use !important to override other backgrounds */
+    border: 2px dashed var(--ai-pending-border) !important; /* Use !important for visibility */
+    padding: calc(1.5rem - 2px); /* Adjust padding to account for border */
+    animation: pulse-bg 2s infinite;
+}
+
+@keyframes pulse-bg {
+    0% { background-color: var(--ai-pending-bg); }
+    50% { background-color: #fffdf5; } /* Slightly lighter yellow */
+    100% { background-color: var(--ai-pending-bg); }
+}
+
 
 /* --- Print Styles --- */
 @media print {
     body { font-family: 'Rubik', 'Arial', sans-serif !important; background-color: var(--bg-white); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    #sidebar, #menu-button, .download-buttons, .gemini-button, .modal, #context-area, #calendar-ai-section .gemini-button, .calendar-button, #api-key-section, #transcription-input-section { display: none !important; }
+    #sidebar, #menu-button, .download-buttons, .gemini-button, .modal, #context-area, #calendar-ai-section .gemini-button, .calendar-button, #api-key-section, #transcription-input-section, .version-controls { display: none !important; }
     #main-content { margin-right: 0 !important; width: 100% !important; padding: 0 !important; }
     .report-section { border: 1px solid #ccc !important; box-shadow: none; padding: 1.5rem; margin-bottom: 1rem; page-break-inside: avoid; }
     #main-header { background: none !important; color: var(--text-primary) !important; text-align: right !important; padding: 1rem 0 !important; box-shadow: none; }
@@ -352,4 +372,5 @@ tr:hover td { background-color: #f0f5f9; }
     table, th, td { border: 1px solid #999 !important; }
     th { background-color: #eee !important; }
     li::before { color: #555 !important; }
+    .ai-updated-pending-save { background-color: transparent !important; border: 1px solid #ccc !important; animation: none; }
 }

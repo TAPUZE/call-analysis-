@@ -131,6 +131,16 @@ async function processNewCall() {
     }
     openModal("🤖 מעבד ניתוח שיחה חדשה..."); 
 
+    // Hide all dynamic sections before processing new call
+    const allReportSections = document.querySelectorAll('.report-section[id^="section-"]');
+    allReportSections.forEach(section => {
+        // Don't hide input/API key sections
+        if (section.id !== 'api-key-section' && section.id !== 'transcription-input-section' && section.id !== 'section-context-reeval') {
+            section.classList.add('hidden');
+        }
+    });
+
+
     const promptForFullAnalysis = `${advancedAnalysisPrompt}\n\nהנה תמלול השיחה לניתוח:\n<transcription_text>\n${transcriptionText}\n</transcription_text>\n\nאנא החזר את הניתוח המלא כ-JSON יחיד עם המבנה שצוין למעלה.`;
     
     const payload = {
@@ -186,7 +196,32 @@ async function processNewCall() {
     }
 }
 
+function hasContent(data) {
+    if (data === null || typeof data === 'undefined') return false;
+    if (typeof data === 'string' && data.trim() === '') return false;
+    if (Array.isArray(data) && data.length === 0) return false;
+    if (typeof data === 'object' && !Array.isArray(data) && Object.keys(data).length === 0) return false;
+    // For objects, check if all its array/string properties are empty
+    if (typeof data === 'object' && !Array.isArray(data)) {
+        return Object.values(data).some(value => hasContent(value));
+    }
+    return true;
+}
+
+
 function populateReportWithData(data) {
+    // Helper to show a section if it has content
+    const showSectionIfPopulated = (sectionId, isPopulated) => {
+        const sectionElement = document.getElementById(sectionId);
+        if (sectionElement) {
+            if (isPopulated) {
+                sectionElement.classList.remove('hidden');
+            } else {
+                sectionElement.classList.add('hidden');
+            }
+        }
+    };
+    
     const createListItems = (itemsArray, keyToDisplay = null) => {
         if (!itemsArray || !Array.isArray(itemsArray) || itemsArray.length === 0) {
             return '<li class="text-gray-500 italic">אין נתונים זמינים.</li>';
@@ -205,7 +240,6 @@ function populateReportWithData(data) {
         }).join('');
     };
 
-    // Updated function to handle a single list of action items
     const createGeneralActionListItems = (itemsArray) => {
          if (!itemsArray || !Array.isArray(itemsArray) || itemsArray.length === 0) {
              return '<li class="text-gray-500 italic">אין משימות זמינות.</li>';
@@ -217,12 +251,18 @@ function populateReportWithData(data) {
             if(item.impliedUrgency) taskHTML += `. דחיפות: ${item.impliedUrgency}.`;
             if(item.contextReason) taskHTML += ` (הקשר: ${item.contextReason.replace(/</g, "&lt;").replace(/>/g, "&gt;")}).`;
 
-            // Logic to add "Generate Email Draft" button
-            // This can be based on keywords in taskDescription or if assignedTo is a specific person
             const taskDescLower = (item.taskDescription || "").toLowerCase();
             const assignedToLower = (item.assignedTo || "").toLowerCase();
-            // Example: Add button if task involves outreach and is assigned to a person (not a generic team)
-            if ( (taskDescLower.includes('פנייה ל') || taskDescLower.includes('יצירת קשר עם') || taskDescLower.includes('תיאום עם')) && 
+            
+            const assigneesToOfferEmail = ["אתי", "משה", "אהרון", "קלמן"]; 
+            let isPersonAssigned = false;
+            assigneesToOfferEmail.forEach(name => {
+                if (assignedToLower.includes(name.toLowerCase())) {
+                    isPersonAssigned = true;
+                }
+            });
+            
+            if ( (taskDescLower.includes('פנייה ל') || taskDescLower.includes('יצירת קשר עם') || taskDescLower.includes('תיאום עם') || isPersonAssigned) && 
                  !assignedToLower.includes('צוות') && !assignedToLower.includes('ללא הקצאה') && assignedTo.trim() !== "" ) {
                 let taskContext = item.contextReason || item.taskDescription.split('עם ')[1] || item.taskDescription; 
                 taskHTML += ` <button class="gemini-button ml-2" data-task-context="${taskContext.split('.')[0].trim().replace(/"/g, '&quot;')}" data-assigned-to="${assignedTo}" onclick="generateEmailDraft(this)"><i class="fas fa-wand-magic-sparkles"></i> הפק טיוטת מייל</button>`;
@@ -232,31 +272,47 @@ function populateReportWithData(data) {
          }).join('');
     }
 
-
     // I. Executive Summary
     const summarySectionContent = document.querySelector('#section-summary .section-content');
+    let summaryPopulated = false;
     if (data.executiveSummary && summarySectionContent) {
         const es = data.executiveSummary;
-        let summaryHTML = `<p class="mb-2"><strong>סוג שיחה:</strong> ${es.callType || 'לא צוין'}</p>`;
-        summaryHTML += `<p class="mb-2"><strong>מטרה עיקרית:</strong> ${es.mainPurpose || 'לא צוין'}</p>`;
+        let summaryHTML = '';
+        if (es.callType) summaryHTML += `<p class="mb-2"><strong>סוג שיחה:</strong> ${es.callType}</p>`;
+        if (es.mainPurpose) summaryHTML += `<p class="mb-2"><strong>מטרה עיקרית:</strong> ${es.mainPurpose}</p>`;
         if (es.keyOutcomesAndDecisions && es.keyOutcomesAndDecisions.length > 0) {
             summaryHTML += `<p class="mb-1"><strong>החלטות ותוצאות מפתח:</strong></p><ul class="list-disc pr-5">${createListItems(es.keyOutcomesAndDecisions)}</ul>`;
         }
         if (es.criticalRoadblocks && es.criticalRoadblocks.length > 0) {
             summaryHTML += `<p class="mt-2 mb-1"><strong>חסמים/אתגרים קריטיים:</strong></p><ul class="list-disc pr-5">${createListItems(es.criticalRoadblocks)}</ul>`;
         }
-        summaryHTML += `<p class="mt-2"><strong>סנטימנט כללי:</strong> ${es.overallSentiment || 'לא צוין'}</p>`;
-        summarySectionContent.innerHTML = summaryHTML;
+        if (es.overallSentiment) summaryHTML += `<p class="mt-2"><strong>סנטימנט כללי:</strong> ${es.overallSentiment}</p>`;
+        
+        if (summaryHTML.trim() !== '') {
+            summarySectionContent.innerHTML = summaryHTML;
+            summaryPopulated = true;
+        } else {
+            summarySectionContent.innerHTML = '<p class="text-gray-500 italic">סיכום לא זמין.</p>';
+        }
     } else if (summarySectionContent) {
          summarySectionContent.innerHTML = '<p class="text-gray-500 italic">סיכום לא זמין.</p>';
     }
+    showSectionIfPopulated('section-summary', summaryPopulated);
+    if (summaryPopulated) saveVersion('summary', summarySectionContent.innerHTML);
 
-    // II. Action Items - Now uses a single list
+
+    // II. Action Items
     const allActionItemsUl = document.getElementById('all-action-items');
-    if (data.actionItems && allActionItemsUl) { // data.actionItems is now expected to be an array
+    let actionItemsPopulated = false;
+    if (data.actionItems && Array.isArray(data.actionItems) && data.actionItems.length > 0 && allActionItemsUl) {
         allActionItemsUl.innerHTML = createGeneralActionListItems(data.actionItems);
+        actionItemsPopulated = true;
     } else if (allActionItemsUl) {
         allActionItemsUl.innerHTML = '<li class="text-gray-500 italic">אין משימות ופעולות.</li>';
+    }
+    showSectionIfPopulated('section-action-items', actionItemsPopulated);
+    if (actionItemsPopulated && document.getElementById('action-items-content-area')) {
+        saveVersion('actionItems', document.getElementById('action-items-content-area').innerHTML);
     }
     
     const sectionMappings = {
@@ -270,60 +326,72 @@ function populateReportWithData(data) {
     for (const sectionId in sectionMappings) {
         const sectionData = sectionMappings[sectionId];
         const sectionElement = document.querySelector(`${sectionId} .section-content`);
+        let sectionPopulated = false;
         if (sectionElement) {
-            if (sectionData && typeof sectionData === 'object' && Object.keys(sectionData).length > 0) {
+            if (sectionData && typeof sectionData === 'object' && Object.keys(sectionData).length > 0 && hasContent(sectionData)) {
                 let contentHTML = '';
                 for (const key in sectionData) {
-                    let titleKey = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
-                    const translations = {
-                        "productsServicesDiscussed": "מוצרים/שירותים שנדונו", "customerNeedsAddressed": "צרכי לקוח שטופלו",
-                        "featureRequestsOrFeedback": "בקשות תכונה/משוב", "keyStrengthsUSPs": "חוזקות מרכזיות/USPs", 
-                        "weaknessesImprovements": "חולשות/אזורים לשיפור",
-                        "pricingMentionsOrProposals": "אזכורי תמחור/הצעות", "budgetConstraintsExpressed": "מגבלות תקציב שהובעו",
-                        "valuePropositionDiscussed": "הצעת ערך שנדונה", "paymentTermsMentions": "אזכורי תנאי תשלום",
-                        "customerProfileInsights": "תובנות פרופיל לקוח", "marketSegmentsMentioned": "פלחי שוק שאוזכרו",
-                        "leadSource": "מקור הליד",
-                        "keyTechnologiesPlatforms": "טכנולוגיות/פלטפורמות מפתח", "technicalIssuesReported": "בעיות טכניות שדווחו",
-                        "solutionsProposedOrImplemented": "פתרונות שהוצעו/יושמו", "dataSecurityPrivacyMentions": "אזכורי אבטחת מידע/פרטיות",
-                        "potentialOrExistingPartners": "שותפים פוטנציאליים/קיימים", "competitorMentions": "אזכורי מתחרים",
-                        "externalResourcesNeeded": "משאבים חיצוניים נדרשים"
-                    };
-                    titleKey = translations[key] || titleKey;
+                    if (hasContent(sectionData[key])) { // Only add sub-header if its content exists
+                        let titleKey = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+                        const translations = {
+                            "productsServicesDiscussed": "מוצרים/שירותים שנדונו", "customerNeedsAddressed": "צרכי לקוח שטופלו",
+                            "featureRequestsOrFeedback": "בקשות תכונה/משוב", "keyStrengthsUSPs": "חוזקות מרכזיות/USPs", 
+                            "weaknessesImprovements": "חולשות/אזורים לשיפור",
+                            "pricingMentionsOrProposals": "אזכורי תמחור/הצעות", "budgetConstraintsExpressed": "מגבלות תקציב שהובעו",
+                            "valuePropositionDiscussed": "הצעת ערך שנדונה", "paymentTermsMentions": "אזכורי תנאי תשלום",
+                            "customerProfileInsights": "תובנות פרופיל לקוח", "marketSegmentsMentioned": "פלחי שוק שאוזכרו",
+                            "leadSource": "מקור הליד",
+                            "keyTechnologiesPlatforms": "טכנולוגיות/פלטפורמות מפתח", "technicalIssuesReported": "בעיות טכניות שדווחו",
+                            "solutionsProposedOrImplemented": "פתרונות שהוצעו/יושמו", "dataSecurityPrivacyMentions": "אזכורי אבטחת מידע/פרטיות",
+                            "potentialOrExistingPartners": "שותפים פוטנציאליים/קיימים", "competitorMentions": "אזכורי מתחרים",
+                            "externalResourcesNeeded": "משאבים חיצוניים נדרשים"
+                        };
+                        titleKey = translations[key] || titleKey;
 
-                    if (Array.isArray(sectionData[key]) && sectionData[key].length > 0) {
-                        contentHTML += `<h3>${titleKey}</h3><ul>${createListItems(sectionData[key])}</ul>`;
-                    } else if (typeof sectionData[key] === 'string' && sectionData[key]) {
-                         contentHTML += `<p><strong>${titleKey}:</strong> ${sectionData[key].replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>`;
+                        if (Array.isArray(sectionData[key]) && sectionData[key].length > 0) {
+                            contentHTML += `<h3>${titleKey}</h3><ul>${createListItems(sectionData[key])}</ul>`;
+                            sectionPopulated = true;
+                        } else if (typeof sectionData[key] === 'string' && sectionData[key].trim() !== '') {
+                             contentHTML += `<p><strong>${titleKey}:</strong> ${sectionData[key].replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>`;
+                             sectionPopulated = true;
+                        }
                     }
                 }
                 sectionElement.innerHTML = contentHTML || '<p class="text-gray-500 italic">אין נתונים זמינים לחלק זה.</p>';
             } else {
                 sectionElement.innerHTML = '<p class="text-gray-500 italic">אין נתונים זמינים לחלק זה.</p>';
             }
+            showSectionIfPopulated(sectionId.substring(1), sectionPopulated); // Pass ID without '#'
         }
     }
     
     // Key Concerns
     const concernsListElement = document.getElementById('concerns-list');
+    let concernsPopulated = false;
     if (data.keyConcerns && concernsListElement) {
         let concernsHTML = '';
         if (data.keyConcerns.customerPainPoints && data.keyConcerns.customerPainPoints.length > 0) {
             concernsHTML += '<h3>נקודות כאב של הלקוח:</h3><ul>' + createListItems(data.keyConcerns.customerPainPoints) + '</ul>';
+            concernsPopulated = true;
         }
         if (data.keyConcerns.objectionsRaised && data.keyConcerns.objectionsRaised.length > 0) {
             concernsHTML += '<h3 class="mt-4">התנגדויות שהועלו:</h3><ul>' + createListItems(data.keyConcerns.objectionsRaised) + '</ul>';
+            concernsPopulated = true;
         }
         if (data.keyConcerns.risksOrChallengesDiscussed && data.keyConcerns.risksOrChallengesDiscussed.length > 0) {
             concernsHTML += '<h3 class="mt-4">סיכונים/אתגרים שנדונו:</h3><ul>' + createListItems(data.keyConcerns.risksOrChallengesDiscussed) + '</ul>';
+            concernsPopulated = true;
         }
         concernsListElement.innerHTML = concernsHTML || '<li class="text-gray-500 italic">אין חששות מרכזיים.</li>';
     } else if (concernsListElement) {
         concernsListElement.innerHTML = '<li class="text-gray-500 italic">אין חששות מרכזיים.</li>';
     }
+    showSectionIfPopulated('section-key-concerns', concernsPopulated);
 
 
     // Participant Info
     const participantElement = document.querySelector('#section-participants-roles .section-content');
+    let participantsPopulated = false;
     if (participantElement) {
         if (data.participantInfo && Array.isArray(data.participantInfo) && data.participantInfo.length > 0) {
             let participantHTML = '<ul>';
@@ -332,22 +400,30 @@ function populateReportWithData(data) {
             });
             participantHTML += '</ul>';
             participantElement.innerHTML = participantHTML;
+            participantsPopulated = true;
         } else {
             participantElement.innerHTML = '<p class="text-gray-500 italic">פרטי משתתפים לא זמינים.</p>';
         }
     }
+    showSectionIfPopulated('section-participants-roles', participantsPopulated);
 
 
     // Important Quotes
     const quotesElement = document.querySelector('#section-quotes .section-content');
+    let quotesPopulated = false;
     if (data.importantQuotes && data.importantQuotes.length > 0) {
-       if(quotesElement) quotesElement.innerHTML = `<ul>${createListItems(data.importantQuotes)}</ul>`;
+       if(quotesElement) {
+            quotesElement.innerHTML = `<ul>${createListItems(data.importantQuotes)}</ul>`;
+            quotesPopulated = true;
+       }
     } else {
         if(quotesElement) quotesElement.innerHTML = '<p class="text-gray-500 italic">אין ציטוטים חשובים.</p>';
     }
+    showSectionIfPopulated('section-quotes', quotesPopulated);
 
     // People Mentioned Table
     const peopleTableBody = document.querySelector('#people-mentioned-table tbody');
+    let peopleTablePopulated = false;
     if (peopleTableBody) {
         if (data.peopleMentionedTable && data.peopleMentionedTable.length > 0) {
             let tableHTML = '';
@@ -359,20 +435,32 @@ function populateReportWithData(data) {
                               </tr>`;
             });
             peopleTableBody.innerHTML = tableHTML;
+            peopleTablePopulated = true;
         } else {
             peopleTableBody.innerHTML = '<tr><td colspan="3" class="text-gray-500 italic text-center">לא הוזכרו אישים/גורמים ספציפיים.</td></tr>';
         }
     }
+    showSectionIfPopulated('section-people-mentioned', peopleTablePopulated);
 
 
     // AI Notes
     const aiNotesElement = document.querySelector('#section-ai-notes .section-content');
+    let aiNotesPopulated = false;
     if (data.aiNotes && data.aiNotes.length > 0) {
-        if(aiNotesElement) aiNotesElement.innerHTML = `<ul>${createListItems(data.aiNotes)}</ul>`;
+        if(aiNotesElement) {
+            aiNotesElement.innerHTML = `<ul>${createListItems(data.aiNotes)}</ul>`;
+            aiNotesPopulated = true;
+        }
     } else {
         if(aiNotesElement) aiNotesElement.innerHTML = '<p class="text-gray-500 italic">אין הערות AI.</p>';
     }
+    showSectionIfPopulated('section-ai-notes', aiNotesPopulated);
     
+    // Always show calendar and context re-evaluation sections as they have interactive elements
+    showSectionIfPopulated('section-calendar-ai', true);
+    showSectionIfPopulated('section-context-reeval', true);
+
+
     if(calendarSuggestionsContent) calendarSuggestionsContent.innerHTML = '<p class="text-gray-500 italic">הצעות ליומן יופיעו כאן...</p>';
     if(additionalContextInput) additionalContextInput.value = '';
     if(reevaluationStatus) reevaluationStatus.textContent = '';
@@ -696,14 +784,14 @@ async function reEvaluateAnalysis() {
         reevaluationStatus.className = "mt-3 text-sm text-blue-600";
     }
     
-    const summaryElement = document.querySelector('#section-summary .section-content');
-    const allActionItemsElement = document.getElementById('all-action-items'); 
-
-    const currentReportState = {
-        executiveSummary: summaryElement ? summaryElement.innerHTML : "אין סיכום קיים.",
-        actionItems: allActionItemsElement ? Array.from(allActionItemsElement.querySelectorAll('li')).map(li => li.textContent.split('<button')[0].trim()) : []
-    };
+    const summaryContentArea = document.getElementById('summary-content-area');
+    const actionItemsContentArea = document.getElementById('action-items-content-area'); 
     
+    const currentSummaryText = summaryContentArea ? summaryContentArea.innerText : "אין סיכום קיים.";
+    const currentActionItemsUl = document.getElementById('all-action-items');
+    const currentActionItemsText = currentActionItemsUl ? Array.from(currentActionItemsUl.querySelectorAll('li')).map(li => li.textContent.split('<button')[0].trim()).join('\n- ') : "אין משימות קיימות.";
+
+
     openModal("🔄 עדכון ניתוח עם הקשר חדש");
 
     const prompt = `
@@ -711,11 +799,11 @@ async function reEvaluateAnalysis() {
         
         הניתוח המקורי (בקיצור) הוא:
         <סיכום_מקורי>
-        ${currentReportState.executiveSummary.replace(/<[^>]*>/g, ' ').substring(0, 500)}... 
+        ${currentSummaryText.substring(0, 700)}... 
         </סיכום_מקורי>
 
         <משימות_מקוריות>
-        ${currentReportState.actionItems.join('\n- ')}
+        - ${currentActionItemsText}
         </משימות_מקוריות>
 
         המשתמש הוסיף את ההקשר החדש הבא:
@@ -740,7 +828,7 @@ async function reEvaluateAnalysis() {
         jsonResponseForReval = await callGeminiAPI(prompt, true); 
         const updatedData = JSON.parse(jsonResponseForReval);
 
-        if (updatedData.executiveSummary && summaryElement) {
+        if (updatedData.executiveSummary && summaryContentArea) {
             const es = updatedData.executiveSummary;
             let summaryHTML = `<p class="mb-2"><strong>סוג שיחה:</strong> ${es.callType || 'לא צוין'}</p>`;
             summaryHTML += `<p class="mb-2"><strong>מטרה עיקרית:</strong> ${es.mainPurpose || 'לא צוין'}</p>`;
@@ -751,18 +839,20 @@ async function reEvaluateAnalysis() {
                 summaryHTML += `<p class="mt-2 mb-1"><strong>חסמים/אתגרים קריטיים:</strong></p><ul class="list-disc pr-5">${es.criticalRoadblocks.map(item => `<li>${item.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</li>`).join('')}</ul>`;
             }
             summaryHTML += `<p class="mt-2"><strong>סנטימנט כללי:</strong> ${es.overallSentiment || 'לא צוין'}</p>`;
-            summaryElement.innerHTML = summaryHTML;
+            setAIPendingState('summary', summaryHTML);
         }
 
-        if (updatedData.actionItems && allActionItemsElement) { 
-            allActionItemsElement.innerHTML = createGeneralActionListItems(updatedData.actionItems);
+        const allActionItemsUl = document.getElementById('all-action-items');
+        if (updatedData.actionItems && allActionItemsUl) { 
+            const newActionItemsHTML = createGeneralActionListItems(updatedData.actionItems);
+            setAIPendingState('actionItems', `<ul id="all-action-items">${newActionItemsHTML}</ul>`);
         }
 
         if(reevaluationStatus) {
-            reevaluationStatus.textContent = "הניתוח עודכן בהצלחה!";
-            reevaluationStatus.className = "mt-3 text-sm text-green-600";
+            reevaluationStatus.textContent = "הניתוח עודכן וממתין לאישורך (ראה הדגשה צהובה).";
+            reevaluationStatus.className = "mt-3 text-sm text-yellow-600";
         }
-        setTimeout(() => closeModal(), 1500);
+        closeModal(); 
 
     } catch (error) {
         console.error("Error re-evaluating analysis:", error);
@@ -776,8 +866,7 @@ async function reEvaluateAnalysis() {
             reevaluationStatus.textContent = "שגיאה בעדכון הניתוח.";
             reevaluationStatus.className = "mt-3 text-sm text-red-600";
         }
-    } finally {
-        if(geminiLoadingIndicator) geminiLoadingIndicator.style.display = 'none';
+         if(geminiLoadingIndicator) geminiLoadingIndicator.style.display = 'none'; 
     }
 }
 
@@ -803,8 +892,6 @@ function setupUIEventListeners() {
             if (targetId && targetId.startsWith('#')) {
                 const targetElement = document.querySelector(targetId);
                 if (targetElement) {
-                    // Optional: Smooth scroll
-                    // e.preventDefault(); 
                     // targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }
             }
